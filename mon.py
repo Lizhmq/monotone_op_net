@@ -56,7 +56,13 @@ class MONReLU(nn.Module):
     def derivative(self, *z):
         return tuple((z_ > 0).type_as(z[0]) for z_ in z)
 
-
+class MONLeakyReLU(nn.Module):
+    def forward(self, *z):
+        return tuple(F.leaky_relu(z_) for z_ in z)
+    
+    def derivative(self, *z):
+        return tuple((z_ > 0).type_as(z[0]) \
+                 + (z_ <= 0).type_as(z[0]) * 0.01 for z_ in z)
 
 
 # Convolutional layers w/ FFT-based inverses
@@ -187,6 +193,31 @@ class MONBorderReLU(nn.Module):
 
     def derivative(self, *z):
         return tuple((z_ > 0).type_as(z[0]) for z_ in z)
+
+
+class MONBorderLeakyReLU(nn.Module):
+    def __init__(self, border=1):
+        super().__init__()
+        self.border = border
+
+    def forward(self, *z):
+        zn = tuple(F.leaky_relu(z_) for z_ in z)
+        for i in range(len(zn)):
+            zn[i][:, :, :self.border, :] = 0
+            zn[i][:, :, -self.border:, :] = 0
+            zn[i][:, :, :, :self.border] = 0
+            zn[i][:, :, :, -self.border:] = 0
+        return zn
+
+    def derivative(self, *z):
+        zn = tuple((z_ > 0).type_as(z[0]) \
+                 + (z_ <= 0).type_as(z[0]) * 0.01 for z_ in z)
+        for i in range(len(zn)):
+            zn[i][:, :, :self.border, :] = 0
+            zn[i][:, :, -self.border:, :] = 0
+            zn[i][:, :, :, :self.border] = 0
+            zn[i][:, :, :, -self.border:] = 0
+        return zn
 
 
 class MONMultiConv(nn.Module):
